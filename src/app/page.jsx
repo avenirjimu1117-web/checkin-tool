@@ -260,15 +260,22 @@ export default function App() {
   const [evalLoading, setEvalLoading] = useState(false);
   const [evalExpanded, setEvalExpanded] = useState(true);
 
+  // 起動時にGASからスタッフ一覧・店舗一覧を取得
   useEffect(() => {
-    try { setStaffs(JSON.parse(localStorage.getItem(STAFF_KEY)) || []); } catch { setStaffs([]); }
+    // 店舗はlocalStorageのまま
     try {
       const s = JSON.parse(localStorage.getItem(STORE_KEY));
       setStores(s?.length ? s : [...DEFAULT_STORES]);
     } catch { setStores([...DEFAULT_STORES]); }
+
+    // スタッフはGASから取得
+    if (!GAS_URL || GAS_URL.includes("★")) return;
+    fetch(`${GAS_URL}?type=staffs`)
+      .then(r => r.json())
+      .then(json => { if (json.status === "ok") setStaffs(json.data); })
+      .catch(() => {});
   }, []);
 
-  const saveStaffs = (list) => { setStaffs(list); localStorage.setItem(STAFF_KEY, JSON.stringify(list)); };
   const saveStores = (list) => { setStores(list); localStorage.setItem(STORE_KEY, JSON.stringify(list)); };
 
   const emptyForm = () => setForm({ name: "", store: "", role: "アイリスト", employ: "正社員", mbti: "", nlp: "", ennea: "", note: "" });
@@ -284,40 +291,59 @@ export default function App() {
 
     setEvalLoading(true);
     try {
-      const res = await fetch(`${GAS_URL}?name=${encodeURIComponent(sf.name)}`);
+      const res = await fetch(`${GAS_URL}?type=eval&name=${encodeURIComponent(sf.name)}`);
       const json = await res.json();
       if (json.status === "ok") {
         setEvalData(json.data);
-        // 自己評価のスライダー値をプリセット（参考値として）
         if (json.data.motivation) setMotiv(Number(json.data.motivation));
         if (json.data.stress) {
-          // しんどさが高い → energyを低めに反映
           const st = Number(json.data.stress);
           setEnergy(Math.max(1, 6 - st));
         }
       }
-    } catch (e) {
-      // GAS未設定 or ネットワークエラー → 無視
-    }
+    } catch (e) {}
     setEvalLoading(false);
   };
 
-  const handleSaveStaff = () => {
+  // スタッフ保存（GAS）
+  const handleSaveStaff = async () => {
     if (!form.name?.trim()) return alert("氏名を入力してください");
-    const data = { ...form, id: editId || "s" + Date.now() };
-    const next = editId ? staffs.map(s => s.id === editId ? data : s) : [data, ...staffs];
-    saveStaffs(next);
-    if (current?.id === editId) setCurrent(data);
+    const staff = { ...form, id: editId || "s" + Date.now() };
+
+    // UI即時反映
+    const next = editId ? staffs.map(s => s.id === editId ? staff : s) : [staff, ...staffs];
+    setStaffs(next);
+    if (current?.id === editId) setCurrent(staff);
     setEditId(null);
     emptyForm();
     setTab("manage");
+
+    // GASに保存（バックグラウンド）
+    if (!GAS_URL || GAS_URL.includes("★")) return;
+    fetch(GAS_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "staff", action: "save", staff }),
+    }).catch(() => {});
   };
 
   const handleEditStaff = (s) => { setForm({ ...s }); setEditId(s.id); setTab("manage"); };
+
   const handleDeleteStaff = (id) => {
     if (!confirm("削除しますか？")) return;
-    saveStaffs(staffs.filter(s => s.id !== id));
+    const staff = staffs.find(s => s.id === id);
+    setStaffs(staffs.filter(s => s.id !== id));
     if (current?.id === id) { setCurrent(null); setEvalData(null); }
+
+    // GASから削除（バックグラウンド）
+    if (!GAS_URL || GAS_URL.includes("★") || !staff) return;
+    fetch(GAS_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "staff", action: "delete", staff }),
+    }).catch(() => {});
   };
 
   const handleAddStore = () => {
