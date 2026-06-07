@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 // ============================================================
 //  ★ GAS Web App URL をここに貼り付けてください
 // ============================================================
-const GAS_URL = "★ここにGAS Web AppのURLを貼り付け★";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzd_RBDM1L0LM5KgV92cWTU7rix7uXZmVKl6jEwofI_bEFXbKrDPUohaIrybYLzvwUg/exec";
 
 const STAFF_KEY = "checkin_staffs_v3";
 const STORE_KEY = "checkin_stores_v2";
