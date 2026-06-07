@@ -14,6 +14,7 @@ export async function POST(request) {
     });
     return Response.json(response);
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    console.error("API Error:", error);
+    return Response.json({ error: error.message, details: String(error) }, { status: 500 });
   }
 }
